@@ -7,7 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../constants/app_constants.dart';
 
-final _uuid = Uuid();
+const _uuid = Uuid();
 final _random = Random.secure();
 
 /// Generates a cryptographically random AetherLink node ID.

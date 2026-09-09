@@ -14,41 +14,56 @@ class AetherTheme {
 
   // ── Color Palette ──────────────────────────────────────────────────────────
 
+  // ── Color Palette (Spotify Inspired) ──────────────────────────────────────
+
   // Primary backgrounds
-  static const Color bg         = Color(0xFF0A1628); // Dark navy
-  static const Color bgSurface  = Color(0xFF0F1E38); // Slightly lighter navy
-  static const Color bgCard     = Color(0xFF132040); // Card background
-  static const Color bgElevated = Color(0xFF172549); // Elevated card
+  static const Color bg         = Color(0xFF121212); // Spotify near-black
+  static const Color bgSurface  = Color(0xFF181818); // Spotify dark surface
+  static const Color bgCard     = Color(0xFF181818); // Spotify card surface
+  static const Color bgElevated = Color(0xFF1F1F1F); // Spotify mid-dark interactive
+  static const Color cardHover  = Color(0xFF252525); // Elevated card
 
-  // Accent
-  static const Color teal       = Color(0xFF00D4AA); // Primary teal accent
-  static const Color tealDim    = Color(0xFF00A882); // Dimmed teal
-  static const Color tealFaint  = Color(0xFF0D3830); // Very faint teal bg
+  // Accent (Spotify Green)
+  static const Color teal       = Color(0xFF1ED760); // Iconic Spotify Green
+  static const Color spotifyGreen = Color(0xFF1ED760);
+  static const Color tealDim    = Color(0xFF1DB954); // Green border / dim
+  static const Color tealFaint  = Color(0xFF163824); // Faint green bg
 
-  // SOS / Emergency
-  static const Color sosRed     = Color(0xFFE53E3E);
-  static const Color sosRedDim  = Color(0xFFB02828);
-  static const Color sosSurface = Color(0xFF2D1212);
+  // SOS / Semantic
+  static const Color sosRed     = Color(0xFFF3727F); // Spotify negative red
+  static const Color sosRedDim  = Color(0xFFB03842);
+  static const Color sosSurface = Color(0xFF281416);
+  static const Color warningOrange = Color(0xFFFFA42B); // Spotify warning orange
+  static const Color infoBlue   = Color(0xFF539DF5); // Spotify announcement blue
 
   // Status colors
-  static const Color statusGreen  = Color(0xFF22C55E);
-  static const Color statusYellow = Color(0xFFF59E0B);
-  static const Color statusRed    = Color(0xFFEF4444);
-  static const Color statusGray   = Color(0xFF94A3B8);
+  static const Color statusGreen  = Color(0xFF1ED760);
+  static const Color statusYellow = Color(0xFFFFA42B);
+  static const Color statusRed    = Color(0xFFF3727F);
+  static const Color statusGray   = Color(0xFFB3B3B3);
 
-  // Text
-  static const Color textPrimary   = Color(0xFFF0F6FF);
-  static const Color textSecondary = Color(0xFF94A3B8);
-  static const Color textTertiary  = Color(0xFF4D6187);
+  // Text (Spotify Hierarchy)
+  static const Color textPrimary   = Color(0xFFFFFFFF); // Pure white
+  static const Color textSecondary = Color(0xFFB3B3B3); // Spotify silver
+  static const Color textTertiary  = Color(0xFF7C7C7C); // Muted silver
   static const Color textTeal      = teal;
 
-  // Borders
-  static const Color border      = Color(0xFF1E3050);
-  static const Color borderTeal  = Color(0xFF1A3C40);
+  // Borders & Separators
+  static const Color border      = Color(0xFF282828); // Subtle dark border
+  static const Color borderTeal  = Color(0xFF1DB954); // Green accent border
+  static const Color borderLight = Color(0xFF4D4D4D); // Mid gray border
 
   // Message bubbles
-  static const Color bubbleOut   = Color(0xFF0D3B38); // Outgoing (teal tint)
-  static const Color bubbleIn    = Color(0xFF132040); // Incoming (card)
+  static const Color bubbleOut   = Color(0xFF163824); // Outgoing (Spotify green-black tint)
+  static const Color bubbleIn    = Color(0xFF252525); // Incoming (dark card)
+
+  // ── Heavy Shadows (Spotify Elevation) ──────────────────────────────────────
+  static const List<BoxShadow> shadowHeavy = [
+    BoxShadow(color: Color(0x80000000), blurRadius: 24, offset: Offset(0, 8)),
+  ];
+  static const List<BoxShadow> shadowMedium = [
+    BoxShadow(color: Color(0x4D000000), blurRadius: 8, offset: Offset(0, 8)),
+  ];
 
   // ── Typography ─────────────────────────────────────────────────────────────
 
@@ -61,21 +76,21 @@ class AetherTheme {
   }
 
   static const TextTheme _baseTextTheme = TextTheme(
-    displayLarge:  TextStyle(fontSize: 32, fontWeight: FontWeight.w700, letterSpacing: -0.5, color: textPrimary),
-    displayMedium: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.3, color: textPrimary),
-    displaySmall:  TextStyle(fontSize: 22, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: textPrimary),
-    headlineLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, letterSpacing: 0, color: textPrimary),
-    headlineMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 0, color: textPrimary),
-    headlineSmall: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0, color: textPrimary),
-    titleLarge:    TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0, color: textPrimary),
-    titleMedium:   TextStyle(fontSize: 14, fontWeight: FontWeight.w500, letterSpacing: 0.1, color: textPrimary),
+    displayLarge:  TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.4, color: textPrimary),
+    displayMedium: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.3, color: textPrimary),
+    displaySmall:  TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.2, color: textPrimary),
+    headlineLarge: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: 0, color: textPrimary),
+    headlineMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0, color: textPrimary),
+    headlineSmall: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: 0, color: textPrimary),
+    titleLarge:    TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0, color: textPrimary),
+    titleMedium:   TextStyle(fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 0.1, color: textPrimary),
     titleSmall:    TextStyle(fontSize: 12, fontWeight: FontWeight.w500, letterSpacing: 0.1, color: textSecondary),
     bodyLarge:     TextStyle(fontSize: 16, fontWeight: FontWeight.w400, letterSpacing: 0, color: textPrimary),
     bodyMedium:    TextStyle(fontSize: 14, fontWeight: FontWeight.w400, letterSpacing: 0, color: textPrimary),
     bodySmall:     TextStyle(fontSize: 12, fontWeight: FontWeight.w400, letterSpacing: 0, color: textSecondary),
-    labelLarge:    TextStyle(fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: textPrimary),
-    labelMedium:   TextStyle(fontSize: 12, fontWeight: FontWeight.w500, letterSpacing: 0.3, color: textSecondary),
-    labelSmall:    TextStyle(fontSize: 10, fontWeight: FontWeight.w500, letterSpacing: 0.4, color: textTertiary),
+    labelLarge:    TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 1.4, color: textPrimary),
+    labelMedium:   TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: textSecondary),
+    labelSmall:    TextStyle(fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.8, color: textTertiary),
   );
 
   // ── Theme Data ─────────────────────────────────────────────────────────────
@@ -87,9 +102,9 @@ class AetherTheme {
       scaffoldBackgroundColor: bg,
       colorScheme: const ColorScheme.dark(
         primary: teal,
-        onPrimary: bg,
+        onPrimary: Color(0xFF000000),
         secondary: tealDim,
-        onSecondary: bg,
+        onSecondary: Color(0xFF000000),
         surface: bgSurface,
         onSurface: textPrimary,
         error: sosRed,
@@ -100,7 +115,7 @@ class AetherTheme {
       textTheme: _textTheme,
       primaryTextTheme: _textTheme,
       appBarTheme: AppBarTheme(
-        backgroundColor: bgSurface,
+        backgroundColor: bg,
         foregroundColor: textPrimary,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -109,17 +124,21 @@ class AetherTheme {
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.light,
         ),
-        titleTextStyle: _baseTextTheme.headlineMedium,
+        titleTextStyle: const TextStyle(
+          color: textPrimary,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+        ),
         iconTheme: const IconThemeData(color: textPrimary),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: bgSurface,
+        backgroundColor: bg,
         indicatorColor: tealFaint,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const TextStyle(color: teal, fontSize: 12, fontWeight: FontWeight.w600);
+            return const TextStyle(color: textPrimary, fontSize: 11, fontWeight: FontWeight.w700);
           }
-          return const TextStyle(color: textSecondary, fontSize: 12);
+          return const TextStyle(color: textSecondary, fontSize: 11, fontWeight: FontWeight.w500);
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
@@ -133,44 +152,53 @@ class AetherTheme {
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: border, width: 1),
+          borderRadius: BorderRadius.circular(8), // Spotify 8px radius
+          side: const BorderSide(color: border, width: 0.8),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: bgElevated,
-        hintStyle: const TextStyle(color: textTertiary),
+        hintStyle: const TextStyle(color: textTertiary, fontSize: 14),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: border),
+          borderRadius: BorderRadius.circular(9999), // Spotify full pill search/input
+          borderSide: const BorderSide(color: Colors.transparent),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(9999),
           borderSide: const BorderSide(color: teal, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(9999),
           borderSide: const BorderSide(color: sosRed),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: teal,
-          foregroundColor: bg,
+          foregroundColor: const Color(0xFF000000),
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9999)), // Spotify pill button
+          textStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.4,
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: teal,
-          side: const BorderSide(color: teal),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          foregroundColor: textPrimary,
+          side: const BorderSide(color: textTertiary, width: 1),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9999)), // Spotify outlined pill
+          textStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+          ),
         ),
       ),
       iconTheme: const IconThemeData(color: textSecondary),

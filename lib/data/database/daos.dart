@@ -276,6 +276,42 @@ class ConversationsDao {
     }, where: 'conversation_id = ?', whereArgs: [conversationId]);
   }
 
+  Future<void> incrementUnread(String conversationId) async {
+    final db = await _db.db;
+    await db.rawUpdate('''
+      UPDATE conversations 
+      SET unread_count = unread_count + 1 
+      WHERE conversation_id = ?
+    ''', [conversationId]);
+  }
+
+  Future<void> markConversationRead(String conversationId) async {
+    final db = await _db.db;
+    await db.update('conversations', {
+      'unread_count': 0,
+    }, where: 'conversation_id = ?', whereArgs: [conversationId]);
+  }
+
+  Future<int> getTotalUnreadCount() async {
+    final db = await _db.db;
+    final result = await db.rawQuery('SELECT SUM(unread_count) as total FROM conversations');
+    final val = result.first['total'];
+    if (val == null) return 0;
+    return (val as num).toInt();
+  }
+
+  Future<int> getUnreadCount(String conversationId) async {
+    final db = await _db.db;
+    final rows = await db.query(
+      'conversations',
+      columns: ['unread_count'],
+      where: 'conversation_id = ?',
+      whereArgs: [conversationId],
+    );
+    if (rows.isEmpty) return 0;
+    return (rows.first['unread_count'] as int?) ?? 0;
+  }
+
   Conversation _rowToConversation(Map<String, dynamic> r) => Conversation(
     conversationId: r['conversation_id'] as String,
     peerId: r['peer_id'] as String,

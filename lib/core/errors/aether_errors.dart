@@ -69,15 +69,15 @@ class CryptoError extends AetherError {
 }
 
 class KeyGenerationError extends CryptoError {
-  const KeyGenerationError({dynamic cause}) : super('Failed to generate cryptographic keys', code: 'KEY_GEN_FAILED', cause: cause);
+  const KeyGenerationError({super.cause}) : super('Failed to generate cryptographic keys', code: 'KEY_GEN_FAILED');
 }
 
 class EncryptionError extends CryptoError {
-  const EncryptionError({dynamic cause}) : super('Message encryption failed', code: 'ENCRYPT_FAILED', cause: cause);
+  const EncryptionError({super.cause}) : super('Message encryption failed', code: 'ENCRYPT_FAILED');
 }
 
 class DecryptionError extends CryptoError {
-  const DecryptionError({dynamic cause}) : super('Message decryption failed — authentication tag mismatch', code: 'DECRYPT_FAILED', cause: cause);
+  const DecryptionError({super.cause}) : super('Message decryption failed — authentication tag mismatch', code: 'DECRYPT_FAILED');
 }
 
 class NoSessionKeyError extends CryptoError {
@@ -108,7 +108,7 @@ class DatabaseError extends AetherError {
 }
 
 class DatabaseOpenError extends DatabaseError {
-  const DatabaseOpenError({dynamic cause}) : super('Failed to open AetherLink database', code: 'DB_OPEN_FAILED', cause: cause);
+  const DatabaseOpenError({super.cause}) : super('Failed to open AetherLink database', code: 'DB_OPEN_FAILED');
 }
 
 // --- Protocol errors ---
@@ -118,7 +118,7 @@ class ProtocolError extends AetherError {
 }
 
 class MalformedPacketError extends ProtocolError {
-  const MalformedPacketError({dynamic cause}) : super('Received malformed packet — dropping', code: 'MALFORMED_PACKET', cause: cause);
+  const MalformedPacketError({super.cause}) : super('Received malformed packet — dropping', code: 'MALFORMED_PACKET');
 }
 
 class TtlExpiredError extends ProtocolError {

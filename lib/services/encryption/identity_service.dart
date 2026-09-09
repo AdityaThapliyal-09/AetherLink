@@ -129,6 +129,10 @@ class IdentityService {
   /// Returns the DH private key for ECDH computation.
   /// Called only during key exchange — never transmitted.
   Future<String> getDhPrivateKey() async {
+    if (_cachedIdentity?.dhPrivateKeyRef != null &&
+        _cachedIdentity!.dhPrivateKeyRef.isNotEmpty) {
+      return _cachedIdentity!.dhPrivateKeyRef;
+    }
     return await _storage.read(key: _kDhPrivKey) ?? '';
   }
 

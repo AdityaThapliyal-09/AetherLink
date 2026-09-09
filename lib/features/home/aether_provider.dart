@@ -36,6 +36,12 @@ class AetherProvider extends ChangeNotifier {
   // Stats
   int _pendingMessages = 0;
 
+  // Active chat tracking (peerId currently opened by user)
+  String? _activeChatPeerId;
+
+  // In-app notification stream for incoming messages outside active chat
+  final _inAppNotifStream = StreamController<AetherMessage>.broadcast();
+
   // Subscriptions
   StreamSubscription? _peerSub;
   StreamSubscription? _msgSub;
@@ -56,6 +62,30 @@ class AetherProvider extends ChangeNotifier {
   RoutingTableDao get routingDao => _routingDao;
   MessagesDao get messagesDao => _messagesDao;
   BroadcastDao get broadcastDao => _broadcastDao;
+  String? get activeChatPeerId => _activeChatPeerId;
+  Stream<AetherMessage> get inAppNotifications => _inAppNotifStream.stream;
+
+  int get totalUnreadCount =>
+      _conversations.fold<int>(0, (sum, c) => sum + c.unreadCount);
+
+  int getUnreadForPeer(String peerId) {
+    for (final c in _conversations) {
+      if (c.peerId == peerId) return c.unreadCount;
+    }
+    return 0;
+  }
+
+  void setActiveChat(String? peerId) {
+    _activeChatPeerId = peerId;
+    if (peerId != null) {
+      markConversationRead(peerId);
+    }
+  }
+
+  Future<void> markConversationRead(String peerId) async {
+    await _conversationsDao.markConversationRead(peerId);
+    await _refreshConversations();
+  }
 
   /// Initialize all services and start networking.
   Future<void> initialize() async {
@@ -95,6 +125,9 @@ class AetherProvider extends ChangeNotifier {
     });
 
     _msgSub = _nm.messageUpdates.listen((msg) {
+      if (!msg.isOutgoing && msg.conversationId != _activeChatPeerId) {
+        _inAppNotifStream.add(msg);
+      }
       _refreshConversations();
       notifyListeners();
     });
@@ -135,6 +168,18 @@ class AetherProvider extends ChangeNotifier {
     await _nm.sendSos(message);
   }
 
+  bool hasSessionKey(String peerId) => _nm.hasSessionKey(peerId);
+
+  bool isPeerReady(String peerId) {
+    if (_nm.hasSessionKey(peerId)) return true;
+    final peer = _peers.where((p) => p.nodeId == peerId).firstOrNull;
+    return peer?.connectionState == PeerConnectionState.ready;
+  }
+
+  Future<void> initiateKeyExchange(String peerId) async {
+    await _nm.initiateKeyExchange(peerId);
+  }
+
   Future<void> updateDisplayName(String name) async {
     await IdentityService().updateDisplayName(name);
     _identity = _identity?.copyWith(displayName: name);
@@ -155,6 +200,7 @@ class AetherProvider extends ChangeNotifier {
     _msgSub?.cancel();
     _alertSub?.cancel();
     _stateSub?.cancel();
+    _inAppNotifStream.close();
     _nm.dispose();
     super.dispose();
   }

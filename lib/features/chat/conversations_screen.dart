@@ -14,9 +14,9 @@ class ConversationsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AetherTheme.bg,
-      appBar: AetherAppBar(
+      appBar: const AetherAppBar(
         title: 'Secure Chats',
-        trailing: const Icon(Icons.lock_outline, color: AetherTheme.teal, size: 18),
+        trailing: Icon(Icons.lock_outline, color: AetherTheme.teal, size: 18),
       ),
       body: Consumer<AetherProvider>(
         builder: (ctx, provider, _) {
@@ -68,7 +68,7 @@ class _ConversationTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: AetherTheme.border, width: 1)),
+          border: Border(bottom: BorderSide(color: AetherTheme.border, width: 0.8)),
         ),
         child: Row(
           children: [
@@ -78,7 +78,7 @@ class _ConversationTile extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AetherTheme.bgElevated,
                 shape: BoxShape.circle,
-                border: Border.all(color: AetherTheme.borderTeal, width: 1),
+                border: Border.all(color: AetherTheme.border, width: 0.8),
               ),
               child: Center(
                 child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
@@ -98,7 +98,7 @@ class _ConversationTile extends StatelessWidget {
                         child: Text(name,
                             style: const TextStyle(
                                 color: AetherTheme.textPrimary,
-                                fontSize: 15, fontWeight: FontWeight.w600)),
+                                fontSize: 15, fontWeight: FontWeight.w700)),
                       ),
                       if (lastTime != null)
                         Text(_formatTime(lastTime),
@@ -127,14 +127,14 @@ class _ConversationTile extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AetherTheme.teal,
-                            borderRadius: BorderRadius.circular(10),
+                            color: AetherTheme.teal, // Spotify Green
+                            borderRadius: BorderRadius.circular(9999), // Pill
                           ),
                           child: Text('$unread',
                               style: const TextStyle(
-                                  color: AetherTheme.bg,
+                                  color: Color(0xFF000000), // Black on green
                                   fontSize: 11,
-                                  fontWeight: FontWeight.w700)),
+                                  fontWeight: FontWeight.w800)),
                         ),
                     ],
                   ),

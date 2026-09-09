@@ -56,7 +56,7 @@ class _SosScreenState extends State<SosScreen>
     HapticFeedback.mediumImpact();
 
     const interval = Duration(milliseconds: 50);
-    final total = _holdMs;
+    const total = _holdMs;
     int elapsed = 0;
 
     _progressTimer = Timer.periodic(interval, (t) {
@@ -64,7 +64,7 @@ class _SosScreenState extends State<SosScreen>
       setState(() { _holdProgress = (elapsed / total).clamp(0.0, 1.0); });
     });
 
-    _holdTimer = Timer(Duration(milliseconds: _holdMs), () {
+    _holdTimer = Timer(const Duration(milliseconds: _holdMs), () {
       _activateSos();
     });
   }
@@ -273,7 +273,6 @@ class _SosButton extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-
         if (active)
           Column(
             children: [
@@ -289,6 +288,7 @@ class _SosButton extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AetherTheme.textSecondary,
                   side: const BorderSide(color: AetherTheme.textTertiary),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9999)),
                 ),
                 child: const Text('Cancel SOS'),
               ),
@@ -315,8 +315,8 @@ class _NetworkReachCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AetherTheme.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AetherTheme.border, width: 1),
+        borderRadius: BorderRadius.circular(8), // Spotify 8px
+        border: Border.all(color: AetherTheme.border, width: 0.8),
       ),
       child: Row(
         children: [
@@ -373,10 +373,10 @@ class _AlertTile extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: isSos ? AetherTheme.sosSurface : AetherTheme.bgCard,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8), // Spotify 8px
         border: Border.all(
           color: isSos ? AetherTheme.sosRedDim : AetherTheme.border,
-          width: 1,
+          width: 0.8,
         ),
       ),
       child: Row(
@@ -399,7 +399,7 @@ class _AlertTile extends StatelessWidget {
                                   ? AetherTheme.sosRed
                                   : AetherTheme.textPrimary,
                               fontSize: 13,
-                              fontWeight: FontWeight.w600)),
+                              fontWeight: FontWeight.w700)),
                     ),
                     Text('${alert.hopCount} hops',
                         style: const TextStyle(
@@ -440,8 +440,8 @@ class _BroadcastPanel extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: AetherTheme.bgCard,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AetherTheme.border, width: 1),
+            borderRadius: BorderRadius.circular(8), // Spotify 8px
+            border: Border.all(color: AetherTheme.border, width: 0.8),
           ),
           child: Column(
             children: [
@@ -458,15 +458,15 @@ class _BroadcastPanel extends StatelessWidget {
                   filled: true,
                   fillColor: AetherTheme.bgElevated,
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                     borderSide: const BorderSide(color: AetherTheme.border),
                   ),
                   disabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                     borderSide: const BorderSide(color: AetherTheme.border),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                     borderSide:
                         const BorderSide(color: AetherTheme.teal, width: 1.5),
                   ),
@@ -483,7 +483,9 @@ class _BroadcastPanel extends StatelessWidget {
                   label: const Text('Broadcast to Network'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AetherTheme.teal,
+                    foregroundColor: const Color(0xFF000000),
                     disabledBackgroundColor: AetherTheme.bgElevated,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9999)),
                   ),
                 ),
               ),

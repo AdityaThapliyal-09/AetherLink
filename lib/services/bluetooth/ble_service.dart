@@ -232,13 +232,40 @@ class BleService {
     }
   }
 
+  /// Triggers a loud 2.5-3 second emergency SOS siren tone on the device.
+  Future<void> playSosSiren() async {
+    try {
+      await _methodChannel.invokeMethod('playSosSiren');
+      logger.sos('Emergency SOS siren triggered');
+    } catch (e) {
+      logger.sos('Failed to trigger emergency SOS siren: $e', level: LogLevel.warning);
+    }
+  }
+
+  /// Shows a system heads-up notification for an incoming peer message.
+  Future<void> showMessageNotification({
+    required String senderName,
+    required String messageText,
+    required String peerId,
+  }) async {
+    try {
+      await _methodChannel.invokeMethod('showMessageNotification', {
+        'senderName': senderName,
+        'messageText': messageText,
+        'peerId': peerId,
+      });
+    } catch (e) {
+      logger.network('Failed to dispatch system notification: $e', level: LogLevel.warning);
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Event Handling
   // ---------------------------------------------------------------------------
 
   void _handleNativeEvent(dynamic event) {
     if (event is! Map) return;
-    final map = Map<String, dynamic>.from(event as Map);
+    final map = Map<String, dynamic>.from(event);
     final type = map['type'] as String?;
 
     switch (type) {
@@ -284,7 +311,7 @@ class BleService {
 
   void _handlePacketEvent(dynamic event) {
     if (event is! Map) return;
-    final map = Map<String, dynamic>.from(event as Map);
+    final map = Map<String, dynamic>.from(event);
     final fromNodeId = map['fromNodeId'] as String? ?? '';
     final rawData = map['data'];
 

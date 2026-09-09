@@ -54,11 +54,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       backgroundColor: AetherTheme.bg,
-      appBar: AetherAppBar(title: 'Settings'),
+      appBar: const AetherAppBar(title: 'Settings'),
       body: ListView(
         children: [
           // Identity section
-          SectionHeader(title: 'My Identity'),
+          const SectionHeader(title: 'My Identity'),
           _SettingsCard(
             children: [
               // Display name
@@ -140,24 +140,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
 
-          SectionHeader(title: 'Network'),
-          _SettingsCard(
+          const SectionHeader(title: 'Network'),
+          const _SettingsCard(
             children: [
               _SettingsTile(
                 label: 'Default TTL',
                 value: '${AppConstants.defaultTtl} hops',
               ),
-              const Divider(height: 1, color: AetherTheme.border),
+              Divider(height: 1, color: AetherTheme.border),
               _SettingsTile(
                 label: 'Max Message Size',
                 value: '${AppConstants.maxMessageLength} chars',
               ),
-              const Divider(height: 1, color: AetherTheme.border),
+              Divider(height: 1, color: AetherTheme.border),
               _SettingsTile(
                 label: 'Scan Interval',
                 value: '${AppConstants.bleScanWindowMs ~/ 1000}s scan / ${AppConstants.bleScanRestMs ~/ 1000}s rest',
               ),
-              const Divider(height: 1, color: AetherTheme.border),
+              Divider(height: 1, color: AetherTheme.border),
               _SettingsTile(
                 label: 'Heartbeat Interval',
                 value: '${AppConstants.heartbeatIntervalSeconds}s',
@@ -165,7 +165,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
 
-          SectionHeader(title: 'Developer'),
+          const SectionHeader(title: 'Developer'),
           _SettingsCard(
             children: [
               _SettingsTile(
@@ -178,7 +178,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
 
-          SectionHeader(title: 'Data'),
+          const SectionHeader(title: 'Data'),
           _SettingsCard(
             children: [
               _SettingsTile(
@@ -190,20 +190,149 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
 
-          SectionHeader(title: 'About'),
+          const SectionHeader(title: 'About & Project Credits'),
+          // Brand Header Banner inside Settings
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AetherTheme.bgCard,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AetherTheme.borderTeal, width: 1.2),
+              gradient: LinearGradient(
+                colors: [AetherTheme.tealFaint.withAlpha(60), AetherTheme.bgCard],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AetherTheme.borderTeal, width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AetherTheme.teal.withAlpha(30),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: AetherTheme.tealFaint,
+                        child: const Icon(Icons.hub, color: AetherTheme.teal, size: 26),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            AppConstants.appName,
+                            style: TextStyle(
+                              color: AetherTheme.textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AetherTheme.tealFaint,
+                              borderRadius: BorderRadius.circular(9999),
+                              border: Border.all(color: AetherTheme.borderTeal, width: 0.8),
+                            ),
+                            child: const Text(
+                              'v${AppConstants.appVersion}',
+                              style: TextStyle(
+                                color: AetherTheme.teal,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      const Text(
+                        'Decentralized Disaster Mesh Network',
+                        style: TextStyle(
+                          color: AetherTheme.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'School of Computing • GEHU',
+                        style: TextStyle(
+                          color: AetherTheme.tealDim,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
           _SettingsCard(
             children: [
-              const _SettingsTile(label: 'Version', value: AppConstants.appVersion),
+              _SettingsTile(
+                leading: const Icon(Icons.school_outlined, color: AetherTheme.teal, size: 22),
+                label: 'Project Team & Mentor Credits',
+                value: 'View Details',
+                valueColor: AetherTheme.teal,
+                trailing: const Icon(Icons.chevron_right, color: AetherTheme.teal),
+                onTap: () => context.pushNamed('about'),
+              ),
               const Divider(height: 1, color: AetherTheme.border),
-              const _SettingsTile(
+              _SettingsTile(
+                leading: const Icon(Icons.person_outline, color: AetherTheme.textSecondary, size: 22),
+                label: 'Project Mentor',
+                value: 'Ms. Nidhi Joshi',
+                subtitle: 'Assistant Professor, Dept. of Computer Applications',
+                onTap: () => context.pushNamed('about'),
+              ),
+              const Divider(height: 1, color: AetherTheme.border),
+              _SettingsTile(
+                leading: const Icon(Icons.groups_outlined, color: AetherTheme.textSecondary, size: 22),
+                label: 'Development Team',
+                value: 'Aditya • Ankit • Suhail',
+                subtitle: 'BCA A2 • Academic Session 2026–2027',
+                onTap: () => context.pushNamed('about'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const _SettingsCard(
+            children: [
+              _SettingsTile(label: 'Version', value: AppConstants.appVersion),
+              Divider(height: 1, color: AetherTheme.border),
+              _SettingsTile(
                   label: 'Protocol', value: AppConstants.protocolVersionString),
-              const Divider(height: 1, color: AetherTheme.border),
-              const _SettingsTile(
+              Divider(height: 1, color: AetherTheme.border),
+              _SettingsTile(
                   label: 'Encryption', value: 'X25519 + AES-256-GCM'),
-              const Divider(height: 1, color: AetherTheme.border),
-              const _SettingsTile(label: 'Routing', value: 'Simplified AODV'),
-              const Divider(height: 1, color: AetherTheme.border),
-              const _SettingsTile(label: 'Transport', value: 'Bluetooth LE GATT'),
+              Divider(height: 1, color: AetherTheme.border),
+              _SettingsTile(label: 'Routing', value: 'Simplified AODV'),
+              Divider(height: 1, color: AetherTheme.border),
+              _SettingsTile(label: 'Transport', value: 'Bluetooth LE GATT'),
             ],
           ),
 
@@ -257,7 +386,7 @@ class _SettingsCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
         color: AetherTheme.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AetherTheme.border, width: 1),
       ),
       child: Column(children: children),
@@ -271,6 +400,8 @@ class _SettingsTile extends StatelessWidget {
   final bool mono;
   final Color? valueColor;
   final Widget? trailing;
+  final Widget? leading;
+  final String? subtitle;
   final VoidCallback? onTap;
 
   const _SettingsTile({
@@ -279,6 +410,8 @@ class _SettingsTile extends StatelessWidget {
     this.mono = false,
     this.valueColor,
     this.trailing,
+    this.leading,
+    this.subtitle,
     this.onTap,
   });
 
@@ -286,15 +419,31 @@ class _SettingsTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
+            if (leading != null) ...[
+              leading!,
+              const SizedBox(width: 12),
+            ],
             Expanded(
-              child: Text(label,
-                  style: const TextStyle(
-                      color: AetherTheme.textPrimary, fontSize: 14)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(label,
+                      style: const TextStyle(
+                          color: AetherTheme.textPrimary, fontSize: 14)),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(subtitle!,
+                        style: const TextStyle(
+                            color: AetherTheme.textTertiary, fontSize: 11)),
+                  ],
+                ],
+              ),
             ),
             const SizedBox(width: 12),
             Flexible(

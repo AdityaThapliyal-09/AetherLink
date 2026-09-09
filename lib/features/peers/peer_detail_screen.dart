@@ -39,6 +39,9 @@ class PeerDetailScreen extends StatelessWidget {
       );
     }
 
+    final isReady = peer.connectionState == PeerConnectionState.ready ||
+                    provider.hasSessionKey(peer.nodeId);
+
     return Scaffold(
       backgroundColor: AetherTheme.bg,
       appBar: AetherAppBar(
@@ -92,7 +95,7 @@ class PeerDetailScreen extends StatelessWidget {
             const SizedBox(height: 24),
 
             // Start Chat button
-            if (peer.connectionState == PeerConnectionState.ready)
+            if (isReady || peer.connectionState == PeerConnectionState.connected)
               ElevatedButton.icon(
                 onPressed: () {
                   context.pop();
@@ -107,7 +110,7 @@ class PeerDetailScreen extends StatelessWidget {
 
             // Connection info
             _InfoSection(title: 'Connection', items: [
-              _InfoItem('Status', peer.connectionState.label),
+              _InfoItem('Status', isReady ? 'Ready' : peer.connectionState.label),
               _InfoItem('Type', peer.isDirect ? 'Direct (BLE)' : '${peer.hopCount}-hop relay'),
               if (peer.rssi != null)
                 _InfoItem('Signal', '${peer.rssi} dBm (${_rssiLabel(peer.rssi!)})'),
@@ -129,8 +132,8 @@ class PeerDetailScreen extends StatelessWidget {
                       ? AetherTheme.statusGreen
                       : AetherTheme.statusYellow),
               _InfoItem('Key exchange',
-                  peer.hasPublicKey ? 'Complete' : 'Pending',
-                  color: peer.hasPublicKey
+                  (peer.hasPublicKey || isReady) ? 'Complete' : 'Pending',
+                  color: (peer.hasPublicKey || isReady)
                       ? AetherTheme.statusGreen
                       : AetherTheme.statusYellow),
             ]),
@@ -244,7 +247,7 @@ class _InfoSection extends StatelessWidget {
         Container(
           decoration: BoxDecoration(
             color: AetherTheme.bgCard,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(color: AetherTheme.border, width: 1),
           ),
           child: Column(

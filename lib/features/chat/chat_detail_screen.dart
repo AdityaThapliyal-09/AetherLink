@@ -26,10 +26,25 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   StreamSubscription? _msgSub;
   bool _loading = true;
   bool _sending = false;
+  late AetherProvider _provider;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _provider = context.read<AetherProvider>();
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _provider.setActiveChat(widget.peerId);
+        if (!_provider.hasSessionKey(widget.peerId)) {
+          _provider.initiateKeyExchange(widget.peerId);
+        }
+      }
+    });
     _loadMessages();
   }
 
@@ -42,6 +57,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         _loading = false;
       });
       _scrollToBottom();
+      await provider.markConversationRead(widget.peerId);
     }
 
     // Subscribe to new messages
@@ -56,6 +72,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           }
         });
         _scrollToBottom();
+        provider.markConversationRead(widget.peerId);
       }
     });
   }
@@ -93,6 +110,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   @override
   void dispose() {
+    _provider.setActiveChat(null);
     _msgSub?.cancel();
     _controller.dispose();
     _scrollController.dispose();
@@ -104,14 +122,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final provider = context.watch<AetherProvider>();
     final peer = provider.peers.where((p) => p.nodeId == widget.peerId).firstOrNull;
     final localId = provider.identity?.nodeId ?? '';
+    final isReady = (peer?.connectionState == PeerConnectionState.ready) ||
+                    provider.hasSessionKey(widget.peerId);
 
     return Scaffold(
       backgroundColor: AetherTheme.bg,
-      appBar: _ChatAppBar(peer: peer, peerName: widget.peerName),
+      appBar: _ChatAppBar(peer: peer, peerName: widget.peerName, isReady: isReady),
       body: Column(
         children: [
           // E2E encryption banner
-          _EncryptionBanner(peer: peer),
+          _EncryptionBanner(peer: peer, isReady: isReady),
 
           // Messages
           Expanded(
@@ -144,7 +164,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           _MessageInput(
             controller: _controller,
             sending: _sending,
-            peerReady: peer?.connectionState == PeerConnectionState.ready,
+            peerReady: isReady,
             onSend: _sendMessage,
           ),
         ],
@@ -156,11 +176,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
   final PeerNode? peer;
   final String peerName;
-  const _ChatAppBar({required this.peer, required this.peerName});
+  final bool isReady;
+  const _ChatAppBar({
+    required this.peer,
+    required this.peerName,
+    this.isReady = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final state = peer?.connectionState ?? PeerConnectionState.disconnected;
+    final state = isReady
+        ? PeerConnectionState.ready
+        : (peer?.connectionState ?? PeerConnectionState.disconnected);
     final stateColor = switch (state) {
       PeerConnectionState.ready         => AetherTheme.statusGreen,
       PeerConnectionState.connected ||
@@ -216,7 +243,7 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
               Text(
                 peer != null
                     ? '${state.label}${peer!.hopCount > 0 ? ' · ${peer!.hopCount} hops' : ''}'
-                    : 'Offline',
+                    : (isReady ? 'Ready' : 'Offline'),
                 style: TextStyle(color: stateColor, fontSize: 12),
               ),
             ],
@@ -246,16 +273,18 @@ class _ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
 
 class _EncryptionBanner extends StatelessWidget {
   final PeerNode? peer;
-  const _EncryptionBanner({required this.peer});
+  final bool isReady;
+  const _EncryptionBanner({required this.peer, this.isReady = false});
 
   @override
   Widget build(BuildContext context) {
-    if (peer == null) return const SizedBox.shrink();
-    final hasKey = peer!.hasPublicKey;
+    if (peer == null && !isReady) return const SizedBox.shrink();
+    final hasKey = (peer?.hasPublicKey == true) || isReady;
+    final fingerprint = peer?.hasPublicKey == true ? peer!.keyFingerprint : 'AES-GCM';
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: hasKey ? AetherTheme.tealFaint : AetherTheme.sosSurface,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+      color: hasKey ? const Color(0xFF163824) : AetherTheme.sosSurface,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -267,12 +296,12 @@ class _EncryptionBanner extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             hasKey
-                ? 'End-to-end encrypted · ${peer!.keyFingerprint}'
+                ? 'End-to-end encrypted · $fingerprint'
                 : 'Key exchange pending...',
             style: TextStyle(
-              color: hasKey ? AetherTheme.tealDim : AetherTheme.statusYellow,
+              color: hasKey ? AetherTheme.teal : AetherTheme.statusYellow,
               fontSize: 11,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -303,8 +332,8 @@ class _MessageInput extends StatelessWidget {
         top: 10,
       ),
       decoration: const BoxDecoration(
-        color: AetherTheme.bgSurface,
-        border: Border(top: BorderSide(color: AetherTheme.border, width: 1)),
+        color: AetherTheme.bg, // Near black #121212
+        border: Border(top: BorderSide(color: AetherTheme.border, width: 0.8)),
       ),
       child: Row(
         children: [
@@ -312,23 +341,23 @@ class _MessageInput extends StatelessWidget {
             child: TextField(
               controller: controller,
               enabled: peerReady,
-              style: const TextStyle(color: AetherTheme.textPrimary),
+              style: const TextStyle(color: AetherTheme.textPrimary, fontSize: 14),
               decoration: InputDecoration(
                 hintText: peerReady
                     ? 'Send encrypted message...'
                     : 'Peer not ready — waiting for key exchange...',
-                hintStyle: const TextStyle(color: AetherTheme.textTertiary),
+                hintStyle: const TextStyle(color: AetherTheme.textTertiary, fontSize: 13),
                 filled: true,
                 fillColor: AetherTheme.bgElevated,
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: const BorderSide(color: AetherTheme.border),
+                  borderRadius: BorderRadius.circular(9999), // Spotify full pill
+                  borderSide: const BorderSide(color: Colors.transparent),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(9999),
                   borderSide: const BorderSide(color: AetherTheme.teal, width: 1.5),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
               maxLines: 4,
               minLines: 1,
@@ -345,15 +374,16 @@ class _MessageInput extends StatelessWidget {
               decoration: BoxDecoration(
                 color: peerReady ? AetherTheme.teal : AetherTheme.bgElevated,
                 shape: BoxShape.circle,
+                boxShadow: peerReady ? AetherTheme.shadowMedium : null,
               ),
               child: sending
                   ? const Padding(
                       padding: EdgeInsets.all(12),
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: AetherTheme.bg),
+                          strokeWidth: 2, color: Color(0xFF000000)),
                     )
                   : Icon(Icons.send_rounded,
-                      color: peerReady ? AetherTheme.bg : AetherTheme.textTertiary,
+                      color: peerReady ? const Color(0xFF000000) : AetherTheme.textTertiary,
                       size: 20),
             ),
           ),

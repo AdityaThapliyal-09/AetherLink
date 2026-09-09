@@ -10,7 +10,18 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ParcelUuid
 import android.util.Log
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
+import android.os.VibrationEffect
+import android.os.Vibrator
+import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.aetherlink.aetherlink.MainActivity
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
@@ -49,6 +60,7 @@ class AetherBleManager(
         private val CLIENT_CONFIG_UUID = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB")
 
         private const val MAX_MTU = 512
+        private const val MANUFACTURER_ID = 0xAE78
         private const val SCAN_PERIOD_MS = 10_000L
         private const val SCAN_REST_MS = 5_000L
 
@@ -144,6 +156,17 @@ class AetherBleManager(
             "checkPermissions"   -> result.success(checkBluetoothPermissions())
             "requestPermissions" -> { result.success(false) } // handled by Flutter side via permission_handler
             "isBluetoothEnabled" -> result.success(bluetoothAdapter.isEnabled)
+            "playSosSiren"       -> {
+                playSosSiren()
+                result.success(true)
+            }
+            "showMessageNotification" -> {
+                val senderName = call.argument<String>("senderName") ?: "AetherLink Node"
+                val messageText = call.argument<String>("messageText") ?: ""
+                val peerId = call.argument<String>("peerId") ?: ""
+                showMessageNotification(senderName, messageText, peerId)
+                result.success(true)
+            }
             else -> result.notImplemented()
         }
     }
@@ -299,6 +322,7 @@ class AetherBleManager(
 
     private fun handleStartAdvertising(result: MethodChannel.Result) {
         if (!hasPermission(Manifest.permission.BLUETOOTH_ADVERTISE)) {
+            Log.w(TAG, "handleStartAdvertising: BLUETOOTH_ADVERTISE not granted")
             result.error("PERMISSION_DENIED", "BLUETOOTH_ADVERTISE not granted", null)
             return
         }
@@ -308,48 +332,56 @@ class AetherBleManager(
             setupGattServer()
         }
 
-        val advertiser = bluetoothAdapter.bluetoothLeAdvertiser
-        if (advertiser == null) {
+        val bleAdvertiser = bluetoothAdapter.bluetoothLeAdvertiser
+        if (bleAdvertiser == null) {
+            Log.w(TAG, "handleStartAdvertising: BLE advertising not supported or Bluetooth off")
             result.error("NOT_SUPPORTED", "BLE advertising not supported", null)
             return
         }
+        this.advertiser = bleAdvertiser
 
         val settings = AdvertiseSettings.Builder()
-            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
-            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
+            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
             .setConnectable(true)
             .setTimeout(0) // Advertise indefinitely
             .build()
 
-        // Encode a compact advertisement payload (20 bytes max for manufacturer data)
-        // We put our service UUID in the service UUID list (standard, larger payload allowed)
+        // 1. Primary advertisement data packet (Max 31 bytes total)
+        // 18 bytes for 128-bit Service UUID + 3 bytes flags = 21 bytes <= 31 bytes.
         val data = AdvertiseData.Builder()
-            .setIncludeDeviceName(false) // Save space
+            .setIncludeDeviceName(false)
             .addServiceUuid(ParcelUuid(SERVICE_UUID))
             .build()
 
-        // Scan response carries node ID (first 8 chars) and display name (truncated)
-        // BLE limits service data to 31 bytes total. UUID uses 18 bytes.
-        // We have exactly 13 bytes remaining for the payload string.
-        val nodeIdShort = localNodeId.takeLast(8)
-        val nameShort   = localDisplayName
-        val payloadStr = "$nodeIdShort|$nameShort"
-        
+        // 2. Scan response packet (Max 31 bytes total)
+        // Manufacturer data: 4 bytes header (Len + 0xFF + 2-byte ID) + up to 24 bytes payload = 28 bytes <= 31 bytes!
+        // DO NOT add addServiceData here to prevent exceeding 31 bytes.
+        val nodeIdShort = if (localNodeId.length >= 8) localNodeId.takeLast(8) else localNodeId.padEnd(8, '0')
+        val nameClean = localDisplayName.replace("|", "").take(15)
+        val payloadStr = "$nodeIdShort|$nameClean"
+        val mfrPayload = payloadStr.toByteArray(Charsets.UTF_8).take(24).toByteArray()
+
         val scanResponse = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
-            .addServiceData(ParcelUuid(SERVICE_UUID),
-                payloadStr.toByteArray(Charsets.UTF_8).take(13).toByteArray())
+            .addManufacturerData(MANUFACTURER_ID, mfrPayload)
             .build()
 
-        advertiser?.startAdvertising(settings, data, scanResponse, advertiseCallback)
-        isAdvertising = true
-        Log.i(TAG, "BLE advertising started")
-        result.success(true)
+        try {
+            bleAdvertiser.startAdvertising(settings, data, scanResponse, advertiseCallback)
+            isAdvertising = true
+            Log.i(TAG, "BLE advertising started with payload: $payloadStr")
+            result.success(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "startAdvertising threw exception: ${e.message}")
+            result.error("ADVERTISE_ERROR", e.message, null)
+        }
     }
 
     private val advertiseCallback = object : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
-            Log.i(TAG, "BLE advertising active")
+            Log.i(TAG, "BLE advertising active (LOW_LATENCY, HIGH_POWER)")
+            isAdvertising = true
             sendEvent(mapOf(
                 "type" to "networkStateChanged",
                 "bluetoothEnabled" to true,
@@ -358,8 +390,15 @@ class AetherBleManager(
             ))
         }
         override fun onStartFailure(errorCode: Int) {
-            Log.e(TAG, "BLE advertising failed: $errorCode")
+            Log.e(TAG, "BLE advertising failed: errorCode=$errorCode")
             isAdvertising = false
+            sendEvent(mapOf(
+                "type" to "networkStateChanged",
+                "bluetoothEnabled" to true,
+                "isAdvertising" to false,
+                "isScanning" to isScanning,
+                "error" to "ADVERTISE_FAILED_$errorCode"
+            ))
         }
     }
 
@@ -377,53 +416,58 @@ class AetherBleManager(
 
     private fun handleStartDiscovery(result: MethodChannel.Result) {
         if (!hasPermission(Manifest.permission.BLUETOOTH_SCAN)) {
+            Log.w(TAG, "handleStartDiscovery: BLUETOOTH_SCAN not granted")
             result.error("PERMISSION_DENIED", "BLUETOOTH_SCAN not granted", null)
             return
         }
-        scanner = bluetoothAdapter.bluetoothLeScanner
-        if (scanner == null) {
+        val leScanner = bluetoothAdapter.bluetoothLeScanner
+        if (leScanner == null) {
+            Log.w(TAG, "handleStartDiscovery: Bluetooth not enabled")
             result.error("BLE_DISABLED", "Bluetooth not enabled", null)
             return
         }
-        startScanLoop()
+        this.scanner = leScanner
+        startScan()
         result.success(true)
-    }
-
-    private fun startScanLoop() {
-        scanJob?.cancel()
-        scanJob = scope.launch {
-            while (isActive) {
-                startScan()
-                delay(SCAN_PERIOD_MS)
-                stopScan()
-                delay(SCAN_REST_MS)
-            }
-        }
     }
 
     private fun startScan() {
         if (!hasPermission(Manifest.permission.BLUETOOTH_SCAN)) return
-        val scanFilter = ScanFilter.Builder()
-            .setServiceUuid(ParcelUuid(SERVICE_UUID))
-            .build()
+        val leScanner = scanner ?: bluetoothAdapter.bluetoothLeScanner ?: return
+        this.scanner = leScanner
+
         val settings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+            .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
             .build()
+
+        val filters = listOf(
+            ScanFilter.Builder().setServiceUuid(ParcelUuid(SERVICE_UUID)).build(),
+            ScanFilter.Builder().setManufacturerData(MANUFACTURER_ID, byteArrayOf()).build()
+        )
+
         try {
-            scanner?.startScan(listOf(scanFilter), settings, scanCallback)
+            leScanner.startScan(filters, settings, scanCallback)
             isScanning = true
-            Log.d(TAG, "BLE scan started")
+            Log.i(TAG, "BLE scan started with dual filters (LOW_LATENCY)")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start scan: ${e.message}")
+            Log.w(TAG, "Filtered scan failed (${e.message}), attempting unfiltered scan")
+            try {
+                leScanner.startScan(null, settings, scanCallback)
+                isScanning = true
+                Log.i(TAG, "BLE scan started unfiltered")
+            } catch (e2: Exception) {
+                Log.e(TAG, "Failed to start BLE scan: ${e2.message}")
+            }
         }
     }
 
     private fun stopScan() {
-        if (!hasPermission(Manifest.permission.BLUETOOTH_SCAN)) return
         try {
             scanner?.stopScan(scanCallback)
             isScanning = false
+            Log.d(TAG, "BLE scan stopped")
         } catch (e: Exception) { /* ignore */ }
     }
 
@@ -443,22 +487,46 @@ class AetherBleManager(
         val device = result.device
         val address = device.address
         val rssi = result.rssi
+        val scanRecord = result.scanRecord ?: return
 
-        // Parse service data to extract nodeId and displayName
-        val serviceData = result.scanRecord?.getServiceData(ParcelUuid(SERVICE_UUID))
-        val payload = serviceData?.toString(Charsets.UTF_8) ?: ""
-        val parts = payload.split("|")
-        val nodeIdShort = parts.getOrNull(0)?.trim() ?: ""
-        val displayName = parts.getOrNull(1)?.trim() ?: "AetherNode"
+        // Verify that this device belongs to the AetherLink mesh
+        val hasServiceUuid = scanRecord.serviceUuids?.any { it.uuid == SERVICE_UUID } == true
+        val mfrData = scanRecord.getManufacturerSpecificData(MANUFACTURER_ID)
+        val srvData = scanRecord.getServiceData(ParcelUuid(SERVICE_UUID))
 
-        if (nodeIdShort.isEmpty() || nodeIdShort == localNodeId.takeLast(8)) return
+        if (!hasServiceUuid && mfrData == null && srvData == null) {
+            return // Not an AetherLink device
+        }
 
-        // Reconstruct a recognizable peer ID from the short form
+        // Parse payload (NodeId|DisplayName)
+        val payload = when {
+            mfrData != null && mfrData.isNotEmpty() -> String(mfrData, Charsets.UTF_8)
+            srvData != null && srvData.isNotEmpty() -> String(srvData, Charsets.UTF_8)
+            else -> ""
+        }
+
+        val (nodeIdShort, displayName) = if (payload.isNotEmpty()) {
+            val parts = payload.split("|")
+            val nid = parts.getOrNull(0)?.trim() ?: ""
+            val name = parts.getOrNull(1)?.trim() ?: "AetherNode"
+            Pair(nid, name)
+        } else {
+            // Fallback if scan response packet has not yet been merged by the OS
+            val fallbackShort = address.replace(":", "").takeLast(8).uppercase()
+            Pair(fallbackShort, "AetherNode")
+        }
+
+        if (nodeIdShort.isEmpty()) return
+
+        // Never discover ourselves
+        if (localNodeId.isNotEmpty() && nodeIdShort.equals(localNodeId.takeLast(8), ignoreCase = true)) {
+            return
+        }
+
         val nodeId = "AETH-$nodeIdShort"
-
-        // Map device address to nodeId
         deviceNodeMap[address] = nodeId
 
+        Log.d(TAG, "Discovered peer: $nodeId ($displayName) at $address, RSSI=$rssi")
         sendEvent(mapOf(
             "type" to "peerDiscovered",
             "nodeId" to nodeId,
@@ -614,8 +682,12 @@ class AetherBleManager(
             ContextCompat.checkSelfPermission(context, permission) ==
                     PackageManager.PERMISSION_GRANTED
         } else {
-            // On older Android, BLE doesn't need runtime BLUETOOTH_CONNECT etc.
-            true
+            if (permission == Manifest.permission.BLUETOOTH_SCAN) {
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                        PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
         }
     }
 
@@ -634,6 +706,136 @@ class AetherBleManager(
         return ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Audio Alerts & Notifications
+    // ──────────────────────────────────────────────────────────────────────────
+
+    private var activeSirenJob: Job? = null
+
+    private fun playSosSiren(durationSeconds: Int = 3) {
+        activeSirenJob?.cancel()
+        activeSirenJob = scope.launch(Dispatchers.Default) {
+            try {
+                // Trigger tactile vibration in sync
+                try {
+                    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                    if (vibrator != null && vibrator.hasVibrator()) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            val timings = longArrayOf(0, 450, 150, 450, 150, 450, 150, 450)
+                            val amplitudes = intArrayOf(0, 255, 0, 255, 0, 255, 0, 255)
+                            vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+                        } else {
+                            @Suppress("DEPRECATION")
+                            vibrator.vibrate(longArrayOf(0, 450, 150, 450, 150, 450), -1)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Vibration failed: ${e.message}")
+                }
+
+                // Synthesize dual-frequency wailing emergency siren
+                val sampleRate = 44100
+                val totalSamples = sampleRate * durationSeconds
+                val buffer = ShortArray(totalSamples)
+
+                var phase = 0.0
+                val minFreq = 650.0  // Hz
+                val maxFreq = 1400.0 // Hz
+                val sweepRate = 2.0  // 2 full cycles per second
+
+                for (i in 0 until totalSamples) {
+                    val t = i.toDouble() / sampleRate
+                    val lfo = Math.abs((t * sweepRate % 1.0) * 2.0 - 1.0)
+                    val currentFreq = minFreq + (maxFreq - minFreq) * lfo
+                    phase += 2.0 * Math.PI * currentFreq / sampleRate
+                    buffer[i] = (Math.sin(phase) * Short.MAX_VALUE * 0.92).toInt().toShort()
+                }
+
+                val minBufSize = AudioTrack.getMinBufferSize(
+                    sampleRate,
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT
+                )
+                val bufferSize = Math.max(minBufSize, totalSamples * 2)
+
+                val audioAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+
+                val audioFormat = AudioFormat.Builder()
+                    .setSampleRate(sampleRate)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .build()
+
+                val audioTrack = AudioTrack.Builder()
+                    .setAudioAttributes(audioAttributes)
+                    .setAudioFormat(audioFormat)
+                    .setBufferSizeInBytes(bufferSize)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build()
+
+                audioTrack.play()
+                audioTrack.write(buffer, 0, buffer.size)
+                delay((durationSeconds * 1000).toLong())
+                try {
+                    audioTrack.stop()
+                    audioTrack.release()
+                } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to play emergency SOS siren: ${e.message}")
+            }
+        }
+    }
+
+    private fun showMessageNotification(senderName: String, messageText: String, peerId: String) {
+        try {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+            val channelId = "aetherlink_messages"
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    channelId,
+                    "AetherLink Messages",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Incoming messages from nearby AetherLink nodes"
+                    enableVibration(true)
+                    setShowBadge(true)
+                }
+                nm.createNotificationChannel(channel)
+            }
+
+            val intent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("peerId", peerId)
+                putExtra("peerName", senderName)
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                peerId.hashCode(),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val notif = NotificationCompat.Builder(context, channelId)
+                .setContentTitle(senderName)
+                .setContentText(messageText)
+                .setSmallIcon(android.R.drawable.stat_notify_chat)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .build()
+
+            nm.notify(peerId.hashCode(), notif)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to show message notification: ${e.message}")
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────────

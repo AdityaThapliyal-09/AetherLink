@@ -26,10 +26,10 @@ class NetworkStatusBadge extends StatelessWidget {
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withAlpha(25),
-        borderRadius: BorderRadius.circular(AetherRadius.full),
+        color: AetherTheme.bgElevated,
+        borderRadius: BorderRadius.circular(9999), // Spotify full pill
         border: Border.all(color: color.withAlpha(80), width: 1),
       ),
       child: Row(
@@ -39,16 +39,16 @@ class NetworkStatusBadge extends StatelessWidget {
             _PulsingDot(color: color)
           else
             Icon(icon, color: color, size: 13),
-          const SizedBox(width: 6),
+          const SizedBox(width: 5),
           Text(
             peerCount != null && state == NetworkState.connected
                 ? '$label · $peerCount peer${peerCount == 1 ? '' : 's'}'
                 : label,
             style: TextStyle(
               color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.2,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
             ),
           ),
         ],
@@ -101,8 +101,15 @@ class PeerCard extends StatelessWidget {
   final PeerNode peer;
   final VoidCallback? onTap;
   final VoidCallback? onChat;
+  final int unreadCount;
 
-  const PeerCard({super.key, required this.peer, this.onTap, this.onChat});
+  const PeerCard({
+    super.key,
+    required this.peer,
+    this.onTap,
+    this.onChat,
+    this.unreadCount = 0,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -110,12 +117,12 @@ class PeerCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AetherTheme.bgCard,
-          borderRadius: BorderRadius.circular(AetherRadius.lg),
-          border: Border.all(color: AetherTheme.border, width: 1),
+          borderRadius: BorderRadius.circular(8), // Spotify 8px card
+          border: Border.all(color: AetherTheme.border, width: 0.8),
         ),
         child: Row(
           children: [
@@ -134,7 +141,7 @@ class PeerCard extends StatelessWidget {
                             style: const TextStyle(
                                 color: AetherTheme.textPrimary,
                                 fontSize: 15,
-                                fontWeight: FontWeight.w600),
+                                fontWeight: FontWeight.w700),
                             overflow: TextOverflow.ellipsis),
                       ),
                       if (peer.rssi != null)
@@ -146,21 +153,21 @@ class PeerCard extends StatelessWidget {
                     children: [
                       Text(peer.shortId,
                           style: const TextStyle(
-                              color: AetherTheme.textTertiary,
+                              color: AetherTheme.textSecondary,
                               fontSize: 12,
                               fontFamily: 'monospace')),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                         decoration: BoxDecoration(
-                          color: stateColor.withAlpha(25),
-                          borderRadius: BorderRadius.circular(4),
+                          color: stateColor.withAlpha(30),
+                          borderRadius: BorderRadius.circular(9999), // Pill status tag
                         ),
                         child: Text(
                           peer.isDirect
                               ? peer.connectionState.label
                               : '${peer.connectionState.label} • ${peer.hopCount} hops',
-                          style: TextStyle(color: stateColor, fontSize: 10, fontWeight: FontWeight.w500),
+                          style: TextStyle(color: stateColor, fontSize: 10, fontWeight: FontWeight.w700),
                         ),
                       ),
                     ],
@@ -169,18 +176,51 @@ class PeerCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            // Chat button
-            if (peer.connectionState == PeerConnectionState.ready && onChat != null)
+            // Chat button (Spotify circular play-button motif)
+            if ((peer.connectionState == PeerConnectionState.ready ||
+                 peer.connectionState == PeerConnectionState.connected) && onChat != null)
               GestureDetector(
                 onTap: onChat,
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AetherTheme.tealFaint,
-                    borderRadius: BorderRadius.circular(AetherRadius.md),
-                  ),
-                  child: const Icon(Icons.chat_bubble_outline,
-                      color: AetherTheme.teal, size: 20),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(
+                        color: AetherTheme.teal, // Spotify Green
+                        shape: BoxShape.circle,
+                        boxShadow: AetherTheme.shadowMedium,
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.chat_bubble,
+                            color: Color(0xFF000000), size: 18),
+                      ),
+                    ),
+                    if (unreadCount > 0)
+                      Positioned(
+                        right: -4,
+                        top: -4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: AetherTheme.sosRed,
+                            borderRadius: BorderRadius.circular(9999),
+                            border: Border.all(color: AetherTheme.bgCard, width: 1.5),
+                          ),
+                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                          child: Text(
+                            unreadCount > 99 ? '99+' : '$unreadCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               )
             else
@@ -386,12 +426,12 @@ class SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
       child: Row(
         children: [
-          Text(title.toUpperCase(),
+          Text(title,
               style: const TextStyle(
-                  color: AetherTheme.textTertiary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.2)),
+                  color: AetherTheme.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2)),
           const Spacer(),
           if (trailing != null) trailing!,
         ],
@@ -439,7 +479,7 @@ class EmptyState extends StatelessWidget {
                 style: const TextStyle(
                     color: AetherTheme.textPrimary,
                     fontSize: 18,
-                    fontWeight: FontWeight.w600),
+                    fontWeight: FontWeight.w700),
                 textAlign: TextAlign.center),
             const SizedBox(height: 8),
             Text(subtitle,
@@ -480,8 +520,8 @@ class StatCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AetherTheme.bgCard,
-        borderRadius: BorderRadius.circular(AetherRadius.md),
-        border: Border.all(color: AetherTheme.border, width: 1),
+        borderRadius: BorderRadius.circular(8), // Spotify 8px
+        border: Border.all(color: AetherTheme.border, width: 0.8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -494,7 +534,7 @@ class StatCard extends StatelessWidget {
           const SizedBox(height: 2),
           Text(label,
               style: const TextStyle(
-                  color: AetherTheme.textTertiary, fontSize: 11)),
+                  color: AetherTheme.textSecondary, fontSize: 11, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -518,7 +558,7 @@ class AetherAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: AetherTheme.bgSurface,
+      backgroundColor: AetherTheme.bg, // Deep near-black
       automaticallyImplyLeading: showBack,
       leading: showBack
           ? IconButton(
@@ -533,9 +573,9 @@ class AetherAppBar extends StatelessWidget implements PreferredSizeWidget {
             title,
             style: const TextStyle(
               color: AetherTheme.textPrimary,
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.w700,
-              letterSpacing: -0.3,
+              letterSpacing: -0.2,
             ),
           ),
         ],

@@ -19,7 +19,6 @@
 
     <!-- Modern BLE permissions (API 31+) -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
-        android:usesPermissionFlags="neverForLocation"
         tools:targetApi="s"
         xmlns:tools="http://schemas.android.com/tools"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"
@@ -29,11 +28,9 @@
         tools:targetApi="s"
         xmlns:tools="http://schemas.android.com/tools"/>
 
-    <!-- Location permission for BLE scanning on API 28–30 -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
-        android:maxSdkVersion="30"/>
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"
-        android:maxSdkVersion="30"/>
+    <!-- Location permissions (required for BLE beacon / ad-hoc peer scanning across all Android versions) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
 
     <!-- Foreground service for keeping BLE scanning alive in background -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
@@ -48,6 +45,9 @@
 
     <!-- Wake lock to prevent CPU sleep during active BLE operations -->
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
+
+    <!-- Vibration for emergency SOS siren and message alerts -->
+    <uses-permission android:name="android.permission.VIBRATE"/>
 
     <!-- Receive boot completed to restart foreground service after reboot -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>

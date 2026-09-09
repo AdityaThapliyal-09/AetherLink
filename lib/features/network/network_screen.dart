@@ -17,9 +17,9 @@ class NetworkScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AetherTheme.bg,
-      appBar: AetherAppBar(
+      appBar: const AetherAppBar(
         title: 'Network Topology',
-        trailing: const Icon(Icons.device_hub, color: AetherTheme.teal, size: 20),
+        trailing: Icon(Icons.device_hub, color: AetherTheme.teal, size: 20),
       ),
       body: Consumer<AetherProvider>(
         builder: (ctx, provider, _) {
@@ -281,7 +281,7 @@ class _RouteTable extends StatelessWidget {
                             color: isActive
                                 ? AetherTheme.statusGreen.withAlpha(25)
                                 : AetherTheme.bgElevated,
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(9999),
                           ),
                           child: Text(r.state.label,
                               style: TextStyle(

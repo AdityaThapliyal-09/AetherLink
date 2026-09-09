@@ -20,9 +20,7 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
-import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/errors/aether_errors.dart';
@@ -71,6 +69,9 @@ class NetworkManager {
 
   // In-memory peer map: nodeId → PeerNode
   final Map<String, PeerNode> _peers = {};
+
+  // Track nodes to whom we have dispatched KEY_EXCHANGE
+  final Set<String> _sentKeyExchangeTo = {};
 
   // Store-and-forward pending queue: messageId → AetherPacket
   final Map<String, AetherPacket> _pendingPackets = {};
@@ -136,6 +137,14 @@ class NetworkManager {
     // Subscribe to BLE events
     _bleEventSub = _ble.events.listen(_onBleEvent);
 
+    // Pre-load known peers from database
+    final savedPeers = await _peersDao.getAllPeers();
+    for (final p in savedPeers) {
+      _peers[p.nodeId] = p.copyWith(
+        connectionState: PeerConnectionState.disconnected,
+      );
+    }
+
     // Start networking
     await _startNetworking();
 
@@ -185,18 +194,33 @@ class NetworkManager {
 
   void _onPeerDiscovered(PeerDiscoveredEvent e) {
     final existing = _peers[e.nodeId];
+    final hasKey = _crypto.hasSessionKey(e.nodeId);
     if (existing == null) {
       final peer = PeerNode(
         nodeId: e.nodeId,
         displayName: e.displayName,
-        connectionState: PeerConnectionState.discovering,
+        connectionState: hasKey ? PeerConnectionState.ready : PeerConnectionState.discovering,
         rssi: e.rssi,
         lastSeen: DateTime.now(),
       );
       _peers[e.nodeId] = peer;
       _peersDao.upsertPeer(peer);
     } else {
-      _peers[e.nodeId] = existing.copyWith(rssi: e.rssi, lastSeen: DateTime.now());
+      final nextState = hasKey
+          ? PeerConnectionState.ready
+          : (existing.connectionState == PeerConnectionState.ready
+              ? PeerConnectionState.ready
+              : (existing.connectionState == PeerConnectionState.connected
+                  ? PeerConnectionState.connected
+                  : PeerConnectionState.discovering));
+      _peers[e.nodeId] = existing.copyWith(
+        displayName: (e.displayName.isNotEmpty && !e.displayName.startsWith('Peer '))
+            ? e.displayName
+            : existing.displayName,
+        rssi: e.rssi,
+        lastSeen: DateTime.now(),
+        connectionState: nextState,
+      );
     }
     _notifyPeerUpdate();
 
@@ -205,7 +229,8 @@ class NetworkManager {
   }
 
   void _onPeerConnected(PeerConnectedEvent e) {
-    _updatePeerState(e.nodeId, PeerConnectionState.connected);
+    final hasKey = _crypto.hasSessionKey(e.nodeId);
+    _updatePeerState(e.nodeId, hasKey ? PeerConnectionState.ready : PeerConnectionState.connected);
 
     // Install direct route
     _aodv.installDirectRoute(e.nodeId);
@@ -226,6 +251,7 @@ class NetworkManager {
     _updatePeerState(e.nodeId, PeerConnectionState.disconnected);
     _aodv.onPeerDisconnected(e.nodeId);
     _crypto.clearSessionKey(e.nodeId);
+    _sentKeyExchangeTo.remove(e.nodeId);
 
     if (_peers.values.every((p) => !p.connectionState.isReachable)) {
       _setNetworkState(NetworkState.scanning);
@@ -355,11 +381,16 @@ class NetworkManager {
     final displayName = data['displayName'] as String? ?? 'Unknown';
 
     _updatePeerDisplayName(packet.originId, displayName);
-    _updatePeerState(packet.originId, PeerConnectionState.authenticating);
+    if (_crypto.hasSessionKey(packet.originId)) {
+      _updatePeerState(packet.originId, PeerConnectionState.ready);
+    } else {
+      _updatePeerState(packet.originId, PeerConnectionState.authenticating);
+    }
     logger.network('HELLO received from ${packet.originId} ($displayName)');
   }
 
   Future<void> _sendKeyExchange(String peerId) async {
+    _sentKeyExchangeTo.add(peerId);
     final identity = _localIdentity!;
     final kex = AetherPacket(
       version: 1,
@@ -404,6 +435,12 @@ class NetworkManager {
       _updatePeerState(packet.originId, PeerConnectionState.ready);
       logger.crypto('Session key established with ${packet.originId}');
 
+      // If we haven't sent our key exchange to this peer yet, reply immediately
+      // so key exchange is guaranteed mutual
+      if (!_sentKeyExchangeTo.contains(packet.originId)) {
+        await _sendKeyExchange(packet.originId);
+      }
+
       // Trigger delivery of any pending messages for this peer
       _triggerPendingDelivery();
     } catch (e) {
@@ -439,6 +476,7 @@ class NetworkManager {
       if (_crypto.hasSessionKey(packet.originId)) {
         plaintext = _crypto.decrypt(packet.payload ?? '', packet.originId);
         logger.network('Message decrypted from ${packet.originId}');
+        _updatePeerState(packet.originId, PeerConnectionState.ready);
       } else {
         logger.network('No session key for ${packet.originId} — storing ciphertext only',
             level: LogLevel.warning);
@@ -468,9 +506,19 @@ class NetworkManager {
     await _ensureConversation(packet.originId);
     await _conversationsDao.updateLastMessage(
       packet.originId, plaintext ?? '[encrypted]', msg.timestamp, MessageStatus.delivered);
+    await _conversationsDao.incrementUnread(packet.originId);
 
     _messageStream.add(msg);
     _updatePeerLastSeen(fromPeerId);
+
+    // Dispatch system notification
+    final peer = _peers[packet.originId];
+    final senderName = peer?.displayName ?? packet.originId;
+    unawaited(_ble.showMessageNotification(
+      senderName: senderName,
+      messageText: plaintext ?? '[Encrypted message]',
+      peerId: packet.originId,
+    ));
 
     // Send ACK back
     await _sendAck(packet);
@@ -590,6 +638,9 @@ class NetworkManager {
 
     await _broadcastDao.saveAlert(alert);
     _alertStream.add(alert);
+
+    // Sound loud 2.5-3s emergency SOS siren upon detecting SOS
+    unawaited(_ble.playSosSiren());
 
     // SOS has higher priority TTL — forward aggressively
     if (packet.ttl > 1) {
@@ -736,6 +787,12 @@ class NetworkManager {
 
   AodvManager get aodvManager => _aodv;
 
+  bool hasSessionKey(String peerId) => _crypto.hasSessionKey(peerId);
+
+  Future<void> initiateKeyExchange(String peerId) async {
+    await _sendHello(peerId);
+  }
+
   // ---------------------------------------------------------------------------
   // Private Transport Helpers
   // ---------------------------------------------------------------------------
@@ -772,10 +829,7 @@ class NetworkManager {
 
     // Look up routing table
     RouteEntry? route = _aodv.getRoute(destinationId);
-    if (route == null) {
-      // Initiate route discovery
-      route = await _aodv.discoverRoute(destinationId);
-    }
+    route ??= await _aodv.discoverRoute(destinationId);
 
     await _sendPacketDirect(route.nextHopId, packet);
   }
@@ -804,7 +858,7 @@ class NetworkManager {
 
   void _startRetryTimer() {
     _retryTimer = Timer.periodic(
-      Duration(seconds: AppConstants.storeForwardCheckIntervalSeconds),
+      const Duration(seconds: AppConstants.storeForwardCheckIntervalSeconds),
       (_) => _triggerPendingDelivery(),
     );
   }
@@ -833,7 +887,7 @@ class NetworkManager {
 
   void _startMaintenanceTimer() {
     _maintenanceTimer = Timer.periodic(
-      Duration(seconds: AppConstants.heartbeatIntervalSeconds),
+      const Duration(seconds: AppConstants.heartbeatIntervalSeconds),
       (_) async {
         await _aodv.performMaintenance();
         await _sendHeartbeats();
@@ -870,7 +924,7 @@ class NetworkManager {
 
   Future<void> _cleanStalePeers() async {
     final cutoff = DateTime.now().subtract(
-        Duration(seconds: AppConstants.staleConnectionTimeoutSeconds));
+        const Duration(seconds: AppConstants.staleConnectionTimeoutSeconds));
     final stale = _peers.entries
         .where((e) =>
             e.value.lastSeen != null &&
@@ -892,12 +946,55 @@ class NetworkManager {
   // ---------------------------------------------------------------------------
 
   void _updatePeerState(String nodeId, PeerConnectionState state) {
-    final peer = _peers[nodeId];
+    var peer = _peers[nodeId];
+    final hasSessionKey = _crypto.hasSessionKey(nodeId);
+
+    // If session key exists and state is not disconnected or error, force ready
+    if (hasSessionKey &&
+        state != PeerConnectionState.disconnected &&
+        state != PeerConnectionState.error) {
+      state = PeerConnectionState.ready;
+    }
+
     if (peer != null) {
+      // Guard against accidental downgrade if already ready
+      if (peer.connectionState == PeerConnectionState.ready &&
+          (state == PeerConnectionState.connected ||
+           state == PeerConnectionState.authenticating ||
+           state == PeerConnectionState.connecting ||
+           state == PeerConnectionState.discovering)) {
+        logger.network('Preserving ready state for $nodeId (ignoring downgrade to $state)');
+        return;
+      }
+
       _peers[nodeId] = peer.copyWith(
           connectionState: state, lastSeen: DateTime.now());
       _peersDao.updateConnectionState(nodeId, state);
       _notifyPeerUpdate();
+    } else {
+      final newPeer = PeerNode(
+        nodeId: nodeId,
+        displayName: 'Peer ${nodeId.length >= 4 ? nodeId.substring(nodeId.length - 4).toUpperCase() : nodeId}',
+        connectionState: state,
+        lastSeen: DateTime.now(),
+      );
+      _peers[nodeId] = newPeer;
+      _peersDao.upsertPeer(newPeer);
+      _notifyPeerUpdate();
+
+      _peersDao.getPeer(nodeId).then((dbPeer) {
+        if (dbPeer != null && _peers[nodeId] != null) {
+          _peers[nodeId] = _peers[nodeId]!.copyWith(
+            displayName: (dbPeer.displayName.isNotEmpty && !dbPeer.displayName.startsWith('Peer '))
+                ? dbPeer.displayName
+                : null,
+            publicKey: dbPeer.publicKey,
+            dhPublicKey: dbPeer.dhPublicKey,
+            isTrusted: dbPeer.isTrusted,
+          );
+          _notifyPeerUpdate();
+        }
+      });
     }
   }
 
@@ -954,6 +1051,7 @@ class NetworkManager {
       Permission.bluetoothConnect,
       Permission.bluetoothAdvertise,
       Permission.location,
+      Permission.notification,
     ].request();
 
     final granted = await _ble.checkPermissions();

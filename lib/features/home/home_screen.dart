@@ -49,7 +49,6 @@ class _HomeContent extends StatelessWidget {
     final peers = provider.activePeers;
     final identity = provider.identity;
     final state = provider.networkState;
-    final routes = provider.getRoutingTable();
 
     return CustomScrollView(
       slivers: [
@@ -90,11 +89,15 @@ class _HomeContent extends StatelessWidget {
             delegate: SliverChildBuilderDelegate(
               (ctx, i) {
                 final peer = peers[i];
+                final unread = provider.getUnreadForPeer(peer.nodeId);
                 return PeerCard(
                   peer: peer,
+                  unreadCount: unread,
                   onTap: () => ctx.pushNamed('peerDetail',
                       pathParameters: {'peerId': peer.nodeId}),
-                  onChat: peer.connectionState == PeerConnectionState.ready
+                  onChat: (peer.connectionState == PeerConnectionState.ready ||
+                           peer.connectionState == PeerConnectionState.connected ||
+                           provider.hasSessionKey(peer.nodeId))
                       ? () => ctx.pushNamed('chat',
                           pathParameters: {'peerId': peer.nodeId},
                           queryParameters: {'name': peer.displayName})
@@ -125,38 +128,80 @@ class _Header extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Logo
+              // Logo (Circular Spotify style)
               Container(
-                width: 40, height: 40,
-                decoration: BoxDecoration(
-                  color: AetherTheme.tealFaint,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AetherTheme.borderTeal, width: 1),
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: AetherTheme.bgSurface,
+                  shape: BoxShape.circle,
+                  boxShadow: AetherTheme.shadowHeavy,
                 ),
-                child: const Icon(Icons.hub, color: AetherTheme.teal, size: 22),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: AetherTheme.bgElevated,
+                      child: const Icon(Icons.hub, color: AetherTheme.teal, size: 24),
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('AetherLink',
-                        style: TextStyle(
+                    Row(
+                      children: [
+                        const Text(
+                          'AetherLink',
+                          style: TextStyle(
                             color: AetherTheme.textPrimary,
-                            fontSize: 22,
+                            fontSize: 21,
                             fontWeight: FontWeight.w700,
-                            letterSpacing: -0.3)),
+                            letterSpacing: -0.4,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AetherTheme.bgElevated,
+                            borderRadius: BorderRadius.circular(9999), // Spotify full pill
+                            border: Border.all(color: AetherTheme.borderLight, width: 0.8),
+                          ),
+                          child: const Text(
+                            'v1.0.0',
+                            style: TextStyle(
+                              color: AetherTheme.teal,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
                     if (identity != null)
-                      Text(identity.nodeId,
-                          style: const TextStyle(
-                              color: AetherTheme.textTertiary,
-                              fontSize: 12,
-                              fontFamily: 'monospace')),
+                      Text(
+                        identity.nodeId,
+                        style: const TextStyle(
+                          color: AetherTheme.textSecondary,
+                          fontSize: 12,
+                          fontFamily: 'monospace',
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               NetworkStatusBadge(state: state, peerCount: peerCount),
             ],
           ),
@@ -228,8 +273,7 @@ class _ScanningEmptyState extends StatelessWidget {
       child: EmptyState(
         icon: Icons.radar,
         title: 'Scanning for AetherLink nodes',
-        subtitle: 'Make sure other devices have AetherLink open with Bluetooth enabled. '
-            'Discovery may take 30–60 seconds.',
+        subtitle: 'Ensure nearby devices have AetherLink open with Bluetooth and Location (GPS) turned ON in Android Quick Settings.',
         action: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
@@ -237,7 +281,7 @@ class _ScanningEmptyState extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AetherTheme.borderTeal, width: 1),
           ),
-          child: const Text('Keep Bluetooth enabled and stay nearby',
+          child: const Text('Turn on Bluetooth & Location (GPS)',
               style: TextStyle(color: AetherTheme.teal, fontSize: 13)),
         ),
       ),

@@ -11,8 +11,12 @@ import '../../features/home/home_screen.dart';
 import '../../features/network/network_screen.dart';
 import '../../features/peers/peer_detail_screen.dart';
 import '../../features/settings/settings_screen.dart';
+import '../../features/settings/about_credits_screen.dart';
 import '../../features/sos/sos_screen.dart';
+import '../../features/home/aether_provider.dart';
 import '../theme/aether_theme.dart';
+import '../widgets/in_app_notification_overlay.dart';
+import 'package:provider/provider.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/home',
@@ -92,6 +96,11 @@ final appRouter = GoRouter(
       name: 'diagnostics',
       builder: (ctx, state) => const DiagnosticsScreen(),
     ),
+    GoRoute(
+      path: '/about',
+      name: 'about',
+      builder: (ctx, state) => const AboutCreditsScreen(),
+    ),
   ],
 );
 
@@ -101,13 +110,15 @@ class _ScaffoldWithNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: navigationShell,
-      bottomNavigationBar: _AetherBottomNav(
-        currentIndex: navigationShell.currentIndex,
-        onTap: (i) => navigationShell.goBranch(
-          i,
-          initialLocation: i == navigationShell.currentIndex,
+    return InAppNotificationOverlay(
+      child: Scaffold(
+        body: navigationShell,
+        bottomNavigationBar: _AetherBottomNav(
+          currentIndex: navigationShell.currentIndex,
+          onTap: (i) => navigationShell.goBranch(
+            i,
+            initialLocation: i == navigationShell.currentIndex,
+          ),
         ),
       ),
     );
@@ -121,10 +132,12 @@ class _AetherBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final unread = context.watch<AetherProvider>().totalUnreadCount;
+
     return Container(
       decoration: const BoxDecoration(
-        color: AetherTheme.bgSurface,
-        border: Border(top: BorderSide(color: AetherTheme.border, width: 1)),
+        color: AetherTheme.bg, // Spotify near-black #121212
+        border: Border(top: BorderSide(color: AetherTheme.border, width: 0.8)),
       ),
       child: SafeArea(
         top: false,
@@ -133,15 +146,40 @@ class _AetherBottomNav extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _NavItem(icon: Icons.hub_outlined, activeIcon: Icons.hub, label: 'Network',
-                  index: 0, currentIndex: currentIndex, onTap: onTap),
-              _NavItem(icon: Icons.chat_bubble_outline, activeIcon: Icons.chat_bubble,
-                  label: 'Chats', index: 1, currentIndex: currentIndex, onTap: onTap),
+              _NavItem(
+                icon: Icons.hub_outlined,
+                activeIcon: Icons.hub,
+                label: 'Network',
+                index: 0,
+                currentIndex: currentIndex,
+                onTap: onTap,
+              ),
+              _NavItem(
+                icon: Icons.chat_bubble_outline,
+                activeIcon: Icons.chat_bubble,
+                label: 'Chats',
+                index: 1,
+                currentIndex: currentIndex,
+                badgeCount: currentIndex != 1 ? unread : 0,
+                onTap: onTap,
+              ),
               _SosNavItem(currentIndex: currentIndex, onTap: onTap),
-              _NavItem(icon: Icons.device_hub_outlined, activeIcon: Icons.device_hub,
-                  label: 'Topology', index: 3, currentIndex: currentIndex, onTap: onTap),
-              _NavItem(icon: Icons.settings_outlined, activeIcon: Icons.settings,
-                  label: 'Settings', index: 4, currentIndex: currentIndex, onTap: onTap),
+              _NavItem(
+                icon: Icons.device_hub_outlined,
+                activeIcon: Icons.device_hub,
+                label: 'Topology',
+                index: 3,
+                currentIndex: currentIndex,
+                onTap: onTap,
+              ),
+              _NavItem(
+                icon: Icons.settings_outlined,
+                activeIcon: Icons.settings,
+                label: 'Settings',
+                index: 4,
+                currentIndex: currentIndex,
+                onTap: onTap,
+              ),
             ],
           ),
         ),
@@ -156,6 +194,7 @@ class _NavItem extends StatelessWidget {
   final String label;
   final int index;
   final int currentIndex;
+  final int badgeCount;
   final ValueChanged<int> onTap;
 
   const _NavItem({
@@ -164,6 +203,7 @@ class _NavItem extends StatelessWidget {
     required this.label,
     required this.index,
     required this.currentIndex,
+    this.badgeCount = 0,
     required this.onTap,
   });
 
@@ -177,22 +217,57 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: Icon(
-                isActive ? activeIcon : icon,
-                key: ValueKey(isActive),
-                color: isActive ? AetherTheme.teal : AetherTheme.textTertiary,
-                size: 24,
-              ),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    isActive ? activeIcon : icon,
+                    key: ValueKey(isActive),
+                    color: isActive ? AetherTheme.textPrimary : AetherTheme.textSecondary,
+                    size: 24,
+                  ),
+                ),
+                if (badgeCount > 0)
+                  Positioned(
+                    right: -10,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: AetherTheme.teal, // Spotify Green
+                        borderRadius: BorderRadius.circular(9999),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x661ED760),
+                            blurRadius: 6,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      child: Text(
+                        badgeCount > 99 ? '99+' : '$badgeCount',
+                        style: const TextStyle(
+                          color: Color(0xFF000000), // Black on green
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
                 fontSize: 10,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                color: isActive ? AetherTheme.teal : AetherTheme.textTertiary,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                color: isActive ? AetherTheme.textPrimary : AetherTheme.textSecondary,
+                letterSpacing: 0.2,
               ),
             ),
           ],
@@ -221,12 +296,13 @@ class _SosNavItem extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: isActive ? AetherTheme.sosRed : AetherTheme.sosSurface,
+                color: isActive ? AetherTheme.sosRed : const Color(0xFF281416),
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: isActive ? AetherTheme.sosRed : AetherTheme.sosRedDim,
-                  width: 1.5,
+                  width: 1.2,
                 ),
+                boxShadow: isActive ? AetherTheme.shadowHeavy : null,
               ),
               child: Icon(
                 Icons.emergency,
@@ -240,7 +316,7 @@ class _SosNavItem extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
-                color: isActive ? AetherTheme.sosRed : AetherTheme.textTertiary,
+                color: isActive ? AetherTheme.sosRed : AetherTheme.textSecondary,
                 letterSpacing: 0.5,
               ),
             ),

@@ -4,14 +4,31 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattServer
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 
 class AetherServerConnection(
     private val device: BluetoothDevice,
     private val gattServer: BluetoothGattServer,
     private val rxChar: BluetoothGattCharacteristic
 ) : AetherConnection {
+    companion object {
+        private const val TAG = "AetherServerConn"
+        private const val WATCHDOG_TIMEOUT_MS = 3000L
+    }
+
     private val writeQueue = java.util.concurrent.ConcurrentLinkedQueue<ByteArray>()
     private val isWriting = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val watchdogRunnable = Runnable {
+        if (isWriting.get()) {
+            Log.w(TAG, "Notification watchdog timeout on ${device.address} - advancing queue")
+            writeQueue.poll()
+            isWriting.set(false)
+            processNextWrite()
+        }
+    }
 
     override fun sendData(data: ByteArray): Boolean {
         writeQueue.add(data)
@@ -38,21 +55,27 @@ class AetherServerConnection(
             false
         }
 
-        if (!success) {
+        if (success) {
+            mainHandler.removeCallbacks(watchdogRunnable)
+            mainHandler.postDelayed(watchdogRunnable, WATCHDOG_TIMEOUT_MS)
+        } else {
             isWriting.set(false)
-            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            mainHandler.removeCallbacks(watchdogRunnable)
+            mainHandler.postDelayed({
                 processNextWrite()
             }, 50)
         }
     }
 
     fun onNotificationSent() {
+        mainHandler.removeCallbacks(watchdogRunnable)
         writeQueue.poll()
         isWriting.set(false)
         processNextWrite()
     }
 
     override fun disconnect() {
+        mainHandler.removeCallbacks(watchdogRunnable)
         gattServer.cancelConnection(device)
     }
 }

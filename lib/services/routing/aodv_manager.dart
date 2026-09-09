@@ -93,7 +93,7 @@ class AodvManager {
       sequenceNumber: generateSequenceNumber(),
       state: RouteState.active,
       lastUpdated: now,
-      expiresAt: now.add(Duration(seconds: AppConstants.routeExpirySeconds)),
+      expiresAt: now.add(const Duration(seconds: AppConstants.routeExpirySeconds)),
     );
     await _upsertRoute(route);
     logger.routing('Direct route installed: $peerId → $peerId (0 hops)');
@@ -298,7 +298,7 @@ class AodvManager {
       sequenceNumber: rrep.sequenceNumber,
       state: RouteState.active,
       lastUpdated: DateTime.now(),
-      expiresAt: DateTime.now().add(Duration(seconds: AppConstants.routeExpirySeconds)),
+      expiresAt: DateTime.now().add(const Duration(seconds: AppConstants.routeExpirySeconds)),
     ));
 
     if (rrep.destinationId == localNodeId) {
@@ -400,7 +400,9 @@ class AodvManager {
     if (existing != null && existing.isUsable) {
       if (existing.sequenceNumber > route.sequenceNumber) return;
       if (existing.sequenceNumber == route.sequenceNumber &&
-          existing.hopCount <= route.hopCount) return;
+          existing.hopCount <= route.hopCount) {
+        return;
+      }
     }
     await _upsertRoute(route);
     logger.routing('Route installed: ${route.destinationId} via ${route.nextHopId} (${route.hopCount} hops)');
@@ -415,7 +417,7 @@ class AodvManager {
       sequenceNumber: seqNum,
       state: RouteState.active,
       lastUpdated: DateTime.now(),
-      expiresAt: DateTime.now().add(Duration(seconds: AppConstants.routeExpirySeconds)),
+      expiresAt: DateTime.now().add(const Duration(seconds: AppConstants.routeExpirySeconds)),
     );
     await _installRoute(route);
   }

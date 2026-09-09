@@ -183,6 +183,24 @@ class Conversation extends Equatable {
     this.lastMessageStatus,
   });
 
+  Conversation copyWith({
+    String? conversationId,
+    String? peerId,
+    String? peerName,
+    String? lastMessageText,
+    DateTime? lastMessageTime,
+    int? unreadCount,
+    MessageStatus? lastMessageStatus,
+  }) => Conversation(
+    conversationId: conversationId ?? this.conversationId,
+    peerId: peerId ?? this.peerId,
+    peerName: peerName ?? this.peerName,
+    lastMessageText: lastMessageText ?? this.lastMessageText,
+    lastMessageTime: lastMessageTime ?? this.lastMessageTime,
+    unreadCount: unreadCount ?? this.unreadCount,
+    lastMessageStatus: lastMessageStatus ?? this.lastMessageStatus,
+  );
+
   @override
   List<Object?> get props => [conversationId, peerId];
 }

@@ -101,23 +101,6 @@ class CryptoService {
     return KeyPair(publicKey: bytesToHex(pub), privateKey: bytesToHex(priv));
   }
 
-  String _extractKeyBytes(AsymmetricKey key) {
-    try {
-      // Try to serialize via SubjectPublicKeyInfo/PrivateKeyInfo if available
-      if (key is ECPrivateKey) {
-        return bytesToHex(key.d!.toUint8ListFromBigInt());
-      } else if (key is ECPublicKey) {
-        return bytesToHex(key.Q!.getEncoded(true));
-      }
-    } catch (_) {}
-    // Last resort: random 32 bytes
-    final bytes = Uint8List(32);
-    for (var i = 0; i < 32; i++) {
-      bytes[i] = _secureRandom.nextUint8();
-    }
-    return bytesToHex(bytes);
-  }
-
   // ---------------------------------------------------------------------------
   // X25519 ECDH Key Agreement
   // ---------------------------------------------------------------------------
@@ -233,9 +216,9 @@ class CryptoService {
       AEADParameters(KeyParameter(key), 128, nonce, Uint8List(0)),
     );
     final output = Uint8List(cipher.getOutputSize(plaintext.length));
-    var offset = cipher.processBytes(plaintext, 0, plaintext.length, output, 0);
-    cipher.doFinal(output, offset);
-    return output;
+    final offset = cipher.processBytes(plaintext, 0, plaintext.length, output, 0);
+    final finalLen = offset + cipher.doFinal(output, offset);
+    return output.sublist(0, finalLen);
   }
 
   Uint8List _aesGcmDecrypt(Uint8List key, Uint8List nonce, Uint8List ciphertext) {
@@ -245,9 +228,9 @@ class CryptoService {
       AEADParameters(KeyParameter(key), 128, nonce, Uint8List(0)),
     );
     final output = Uint8List(cipher.getOutputSize(ciphertext.length));
-    var offset = cipher.processBytes(ciphertext, 0, ciphertext.length, output, 0);
-    cipher.doFinal(output, offset);
-    return output;
+    final offset = cipher.processBytes(ciphertext, 0, ciphertext.length, output, 0);
+    final finalLen = offset + cipher.doFinal(output, offset);
+    return output.sublist(0, finalLen);
   }
 
   // ---------------------------------------------------------------------------
@@ -324,17 +307,5 @@ class _Hmac {
 
   crypto.Digest convert(List<int> data) {
     return crypto.Hmac(_hash, _key).convert(data);
-  }
-}
-
-/// Extension to convert BigInt to Uint8List
-extension _BigIntExt on BigInt {
-  Uint8List toUint8ListFromBigInt() {
-    final hexStr = toRadixString(16).padLeft(64, '0');
-    final bytes = Uint8List(hexStr.length ~/ 2);
-    for (var i = 0; i < bytes.length; i++) {
-      bytes[i] = int.parse(hexStr.substring(i * 2, i * 2 + 2), radix: 16);
-    }
-    return bytes;
   }
 }

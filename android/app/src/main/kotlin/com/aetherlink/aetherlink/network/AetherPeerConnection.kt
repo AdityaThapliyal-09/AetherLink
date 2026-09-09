@@ -32,6 +32,7 @@ class AetherPeerConnection(
         private val RX_CHAR_UUID = UUID.fromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E")
         private val CLIENT_CONFIG_UUID = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB")
         private const val TARGET_MTU = 512
+        private const val WATCHDOG_TIMEOUT_MS = 3000L
     }
 
     private var gatt: BluetoothGatt? = null
@@ -42,6 +43,17 @@ class AetherPeerConnection(
     // Write queue for ordered delivery
     private val writeQueue = ArrayDeque<ByteArray>()
     private var isWriting = false
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val watchdogRunnable = Runnable {
+        synchronized(writeQueue) {
+            if (isWriting) {
+                Log.w(TAG, "Write watchdog timeout on $nodeId - advancing queue")
+                writeQueue.removeFirstOrNull()
+                isWriting = false
+                processNextWrite()
+            }
+        }
+    }
 
     fun connect(context: Context) {
         Log.d(TAG, "Connecting to $nodeId (${device.address})")
@@ -54,6 +66,7 @@ class AetherPeerConnection(
     }
 
     override fun disconnect() {
+        mainHandler.removeCallbacks(watchdogRunnable)
         connected.set(false)
         gatt?.disconnect()
         gatt?.close()
@@ -107,10 +120,14 @@ class AetherPeerConnection(
                 false
             }
 
-            if (!success) {
+            if (success) {
+                mainHandler.removeCallbacks(watchdogRunnable)
+                mainHandler.postDelayed(watchdogRunnable, WATCHDOG_TIMEOUT_MS)
+            } else {
+                mainHandler.removeCallbacks(watchdogRunnable)
                 isWriting = false
                 // Retry after a short delay
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                mainHandler.postDelayed({
                     processNextWrite()
                 }, 50)
             }
@@ -219,6 +236,7 @@ class AetherPeerConnection(
             characteristic: BluetoothGattCharacteristic,
             status: Int
         ) {
+            mainHandler.removeCallbacks(watchdogRunnable)
             synchronized(writeQueue) {
                 writeQueue.removeFirstOrNull() // Remove the sent item
                 if (status != BluetoothGatt.GATT_SUCCESS) {
